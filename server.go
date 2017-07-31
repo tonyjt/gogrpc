@@ -118,7 +118,7 @@ func (server *Server) signalHandler() {
 	for {
 		sig := <-ch
 		switch sig {
-		case syscall.SIGINT, syscall.SIGTERM:
+		case syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP:
 			// this ensures a subsequent INT/TERM will trigger standard go behaviour of
 			// terminating.
 			// signal.Stop(ch)
@@ -126,7 +126,7 @@ func (server *Server) signalHandler() {
 			server.gs.GracefulStop()
 			server.Close()
 			return
-		case syscall.SIGUSR2, syscall.SIGHUP:
+		case syscall.SIGUSR2:
 			// we only return here if there's an error, otherwise the new process
 			// will send us a TERM when it's ready to trigger the actual shutdown.
 
