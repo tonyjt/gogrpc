@@ -105,38 +105,28 @@ func (server *Server) signalHandler() {
 	for {
 		sig := <-ch
 		switch sig {
-		case syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP:
-			// this ensures a subsequent INT/TERM will trigger standard go behaviour of
-			// terminating.
-			// signal.Stop(ch)
-			server.parallelStop()
-			return
 		case syscall.SIGUSR2:
-			// we only return here if there's an error, otherwise the new process
-			// will send us a TERM when it's ready to trigger the actual shutdown.
-
+			// on SIGUSR2, start a new process, then stop.
 			if pid, err := server.net.StartProcess(); err != nil {
 				glog.Infof("start new process failed,err:%s \n", err.Error())
 			} else {
 				glog.Infof("start new process, pid:%d \n", pid)
 			}
-			server.parallelStop()
+			fallthrough // Still stop below
+		default:
+			// stop on other cases, even if no child is started.
+			wg := sync.WaitGroup{}
+			wg.Add(2)
+			go func() {
+				server.gs.GracefulStop()
+				wg.Done()
+			}()
+			go func() {
+				server.Close()
+				wg.Done()
+			}()
+			wg.Wait()
 			return
-			//server.gs.Stop()
 		}
 	}
-}
-
-func (server *Server) parallelStop() {
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	go func() {
-		server.gs.GracefulStop()
-		wg.Done()
-	}()
-	go func() {
-		server.Close()
-		wg.Done()
-	}()
-	wg.Wait()
 }
