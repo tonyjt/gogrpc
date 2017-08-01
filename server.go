@@ -49,10 +49,11 @@ func NewServer(nett, laddr string, opt ...grpc.ServerOption) *Server {
 //Serve serve
 func (server *Server) Serve() error {
 
-	err := server.listen()
+	l, err := server.net.Listen(server.nett, server.laddr)
 	if err != nil {
 		return err
 	}
+	server.listener = l
 
 	// Some useful logging.
 	if *verbose {
@@ -72,7 +73,7 @@ func (server *Server) Serve() error {
 
 	go func() {
 		// Start serving
-		if err := server.serve(); err != nil {
+		if err := server.gs.Serve(server.listener); err != nil {
 			glog.Infof("serve error:%s \n", err.Error())
 		}
 	}()
@@ -95,21 +96,6 @@ func (server *Server) Serve() error {
 //GetServer get grpc server
 func (server *Server) GetServer() *grpc.Server {
 	return server.gs
-}
-
-func (server *Server) listen() error {
-	l, err := server.net.Listen(server.nett, server.laddr)
-
-	if err != nil {
-		return err
-	}
-	server.listener = l
-	return nil
-}
-
-func (server *Server) serve() error {
-
-	return server.gs.Serve(server.listener)
 }
 
 func (server *Server) signalHandler() {
