@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/facebookgo/grace/gracenet"
@@ -108,9 +109,7 @@ func (server *Server) signalHandler() {
 			// this ensures a subsequent INT/TERM will trigger standard go behaviour of
 			// terminating.
 			// signal.Stop(ch)
-
-			server.gs.GracefulStop()
-			server.Close()
+			server.parallelStop()
 			return
 		case syscall.SIGUSR2:
 			// we only return here if there's an error, otherwise the new process
@@ -121,10 +120,23 @@ func (server *Server) signalHandler() {
 			} else {
 				glog.Infof("start new process, pid:%d \n", pid)
 			}
-			server.gs.GracefulStop()
-			server.Close()
+			server.parallelStop()
 			return
 			//server.gs.Stop()
 		}
 	}
+}
+
+func (server *Server) parallelStop() {
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		server.gs.GracefulStop()
+		wg.Done()
+	}()
+	go func() {
+		server.Close()
+		wg.Done()
+	}()
+	wg.Wait()
 }
