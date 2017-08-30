@@ -79,14 +79,15 @@ func (server *Server) Serve() error {
 		}
 	}()
 
-	server.signalHandler()
-
 	// Close the parent if we inherited and it wasn't init that started us.
 	if didInherit && ppid != 1 {
+		glog.Infof("Time to kill my parent, ppid: %d", ppid)
 		if err := syscall.Kill(ppid, syscall.SIGTERM); err != nil {
-			return fmt.Errorf("failed to close parent: %s", err)
+			return fmt.Errorf("failed to close parent - %d: %s", ppid, err)
 		}
 	}
+
+	server.signalHandler()
 
 	if *verbose {
 		glog.Infof("Exiting pid %d.", os.Getpid())
@@ -106,15 +107,14 @@ func (server *Server) signalHandler() {
 		sig := <-ch
 		switch sig {
 		case syscall.SIGUSR2:
-			// on SIGUSR2, start a new process, then stop.
+			// on SIGUSR2, start a new process, then wait to be killed.
 			if pid, err := server.net.StartProcess(); err != nil {
 				glog.Infof("start new process failed,err:%s \n", err.Error())
 			} else {
 				glog.Infof("start new process, pid:%d \n", pid)
 			}
-			fallthrough // Still stop below
 		default:
-			// stop on other cases, even if no child is started.
+			// stop on other cases, since you are a parent being killed
 			wg := sync.WaitGroup{}
 			wg.Add(2)
 			go func() {
